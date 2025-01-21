@@ -1,11 +1,11 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar, View } from 'react-native';
 
-import Home from '../../screens/Home.js';
-import ReportDetails from '../../screens/ReportDetails.js';
-import WriteReport from '../../screens/WriteReport.js';
-import Login from '../../screens/Login.js';
-import AddMoreDetail from '../../screens/AddMoreDetail.js';
+import ReportDetails from '../../src/screens/ReportDetails.js';
+import WriteReport from '../../src/screens/WriteReport.js';
+import Login from '../../src/screens/Login.js';
+import AddMoreDetail from '../../src/screens/AddMoreDetail.js';
+import HomeScreen from '../../src/screens/Home.js';
 
 const Stack = createNativeStackNavigator();
 
@@ -14,7 +14,6 @@ export default function App() {
   return (
     <View style={{ flex: 1 }}>
       <StatusBar barStyle="light-content" backgroundColor="#1877F2" />
-      
       <Stack.Navigator
         initialRouteName="Login"
         screenOptions={{
@@ -35,10 +34,10 @@ export default function App() {
             headerShown: false, // Hide the header for Login screen
           }}
         />
-        <Stack.Screen name="Home" component={Home} />
-        <Stack.Screen name="Detail" component={ReportDetails} />
-        <Stack.Screen name="Write" component={WriteReport} />
-        <Stack.Screen name='Add More' component={AddMoreDetail}/>
+        <Stack.Screen name="Home" component={HomeScreen} options={{headerShown : false}}/>
+        <Stack.Screen name="Detail" component={ReportDetails} options={{headerShown : false}}/>
+        <Stack.Screen name="Write" component={WriteReport} options={{headerShown : false}}/>
+        <Stack.Screen name='Add More' component={AddMoreDetail} options={{headerShown : false}}/>
       </Stack.Navigator>
     </View>
   );

@@ -1,32 +1,37 @@
 import React, { useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  TouchableOpacity,
-  Alert,
-  Image,
-} from 'react-native';
-
-import PoliceLogo from '../assets/images/police_logo.png';
+import { StyleSheet, Text, TextInput, View, TouchableOpacity, Alert, Image } from 'react-native';
+import PoliceLogo from '../../assets/images/police_logo.png';
+import api from '../api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Login = ({navigation}) => {
-  const [email, setEmail] = useState('');
+  const [collarId, setCollarId] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = () => {
-    if (!email.trim() || !password.trim()) {
+  const handleLogin = async () => {
+    if (!collarId.trim() || !password.trim()) {
       Alert.alert('Error', 'Please fill in all fields.');
       return;
-    } else {
-        navigation.navigate("Home");
     }
-    Alert.alert('Success', `Welcome, ${email}`);
-  };
-
-  const handleMicrosoftLogin = () => {
-    Alert.alert('Microsoft Login', 'Microsoft Login button clicked!');
+  
+    try {
+      const response = await api.post('/login', { collar_id: collarId, password });
+      if (response.data.success) {
+        await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+  
+        Alert.alert('Success', `Welcome, Officer ${collarId}`);
+        
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
+      } else {
+        Alert.alert('Login Failed', 'Invalid collar ID or password.');
+      }
+    } catch (error) {
+      console.log("Error during login:", error.message);
+      Alert.alert('Error', 'An error occurred. Please try again later.');
+    }
   };
 
   return (
@@ -44,10 +49,10 @@ const Login = ({navigation}) => {
       <View style={styles.formContainer}>
         <TextInput
           style={styles.input}
-          placeholder="Email"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
+          placeholder="User ID"
+          keyboardType="text"
+          value={collarId}
+          onChangeText={setCollarId}
         />
         <TextInput
           style={styles.input}

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Image, Modal } from 'react-native';
 import api from '../api';
-import { formatDistanceToNow } from 'date-fns';
 
 const image_url = "http://192.168.1.7:4000/api";
 
@@ -43,39 +42,45 @@ const ReportDetails = ({ route, navigation }) => {
         {complaintDetail ? (
           <>
             <Text style={styles.detailTitle}>{complaintDetail.title}</Text>
-            <Text style={{ fontWeight: "bold", marginHorizontal: 8 }}>
-              Added On: {new Date(complaintDetail.created_at).toLocaleDateString()}
-            </Text>
-
             {/* Loop through each description */}
-            {complaintDetail.details?.map((detail, index) => (
-              <View key={index} style={styles.detailBox}>
-                <Text style={styles.dateText}>
-                  Created On: {formatDistanceToNow(new Date(detail.created_at), { addSuffix: true })}
-                </Text>
-                <Text style={styles.detailContent}>{detail.description}</Text>
+            {complaintDetail.details?.map((detail, index) => {
+              const zonedDate = new Date(detail.created_at);
+              const ukTime = new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'Europe/London',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric',
+                hour12: true,
+              }).format(zonedDate);
 
-                {/* Render images if available */}
-                {detail.images?.length > 0 && (
-                  <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={styles.imagesContainer}>
-                    {detail.images.map((image, imgIndex) => (
-                      <TouchableOpacity
-                        key={imgIndex}
-                        onPress={() => handleImagePress(`${image_url}${image.url}`)}
-                        style={styles.imageWrapper}
-                      >
-                        <Image
-                          source={{ uri: `${image_url}${image.url}` }}
-                          style={styles.image}
-                        />
-                        <Text style={styles.imageText}>{image.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
+              return (
+                <View key={index} style={styles.detailBox}>
+                  <Text style={styles.dateText}>Created On: {ukTime}</Text>
+                  <Text style={styles.detailContent}>{detail.description}</Text>
 
-              </View>
-            ))}
+                  {/* Render images if available */}
+                  {detail.images?.length > 0 && (
+                    <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={styles.imagesContainer}>
+                      {detail.images.map((image, imgIndex) => (
+                        <TouchableOpacity
+                          key={imgIndex}
+                          onPress={() => handleImagePress(`${image_url}${image.url}`)}
+                          style={styles.imageWrapper}
+                        >
+                          <Image
+                            source={{ uri: `${image_url}${image.url}` }}
+                            style={styles.image}
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
+
+                </View>
+              );
+            })}
           </>
         ) : (
           <Text>No records found!</Text>

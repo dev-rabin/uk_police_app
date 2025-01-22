@@ -18,9 +18,8 @@ import api from '../api';
 const AddMoreDetail = ({ route, navigation }) => {
   const { complaint_id } = route.params;
   const [complaint, setComplaint] = useState('');
-  const [images, setImages] = useState([]); // Store multiple images
+  const [images, setImages] = useState([]);
 
-  // Request permission to access media library
   const requestPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status === 'granted') {
@@ -37,7 +36,7 @@ const AddMoreDetail = ({ route, navigation }) => {
         complaint_id,
         description,
       });
-      return response.data.data; // Return the complaint_detail_id from the response
+      return response.data.data;
     } catch (error) {
       console.error('Error adding complaint details:', error);
       throw error;
@@ -80,7 +79,7 @@ const AddMoreDetail = ({ route, navigation }) => {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
-      multiple: true,  // Allow multiple images
+      multiple: true,
     });
 
     if (!result.cancelled) {

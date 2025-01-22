@@ -185,25 +185,29 @@ const HomeScreen = ({ navigation }) => {
       {/* Complaints List */}
       <View style={styles.complaintsContainer}>
         {complaints.length > 0 ? (
-          complaints.map((complaint) => (
-            <TouchableOpacity
-              key={complaint.complaint_id}
-              onPress={() => navigation.navigate('Detail', { complaint_id: complaint.complaint_id })}
-            >
-              <View style={styles.complaintBox}>
-                <Ionicons name="document-text" size={50} color="#3b82f6" />
-                <Text style={styles.complaintTitle}>{complaint.title}</Text>
-                <Text style={styles.complaintTime}>
-                  {format(new Date(complaint.created_at), 'MMMM dd, yyyy')}
-                </Text>
-              </View>
-            </TouchableOpacity>
+          [...complaints]
+            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+            .reverse() // Reverse to get latest first
+            .map((complaint) => (
+              <TouchableOpacity
+                key={complaint.complaint_id}
+                onPress={() => navigation.navigate('Detail', { complaint_id: complaint.complaint_id })}
+              >
+                <View style={styles.complaintBox}>
+                  <Ionicons name="document-text" size={50} color="#3b82f6" />
+                  <Text style={styles.complaintTitle}>{complaint.title}</Text>
+                  <Text style={styles.complaintTime}>
+                    {format(new Date(complaint.created_at), 'MMM dd, yyyy')}
+                  </Text>
 
-          ))
+                </View>
+              </TouchableOpacity>
+            ))
         ) : (
           <Text style={styles.noComplaintsText}>No complaints available.</Text>
         )}
       </View>
+
 
       {/* Filter Modal */}
       <Modal

@@ -7,7 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import NetworkStatus from '../network/network';
 
-const HomeScreen = ({ navigation }) => {
+const HomeScreen = ({ navigation, route }) => {
+  
   const [complaints, setComplaints] = useState([]);
   const [user, setUser] = useState(null);
   const [isSearchModalVisible, setSearchModalVisible] = useState(false);
@@ -23,6 +24,8 @@ const HomeScreen = ({ navigation }) => {
 
   const [filterDate, setFilterDate] = useState('');
 
+  const [isFilterApplied, setIsFilterApplied] = useState(false); 
+
   const [isFilterDatePickerVisible, setIsFilterDatePickerVisible] = useState(false);
 
   const showFilterDatePicker = () => setIsFilterDatePickerVisible(true);
@@ -33,22 +36,26 @@ const HomeScreen = ({ navigation }) => {
     hideFilterDatePicker();
   };
 
-  // const deleteDataFromLocalStorage = async (key) => {
-  //   try {
-  //     const data = await AsyncStorage.getItem(key);
-  //     if (data !== null) {
-  //       await AsyncStorage.removeItem(key);
-  //       console.log(`${key} has been removed from local storage.`);
-  //       Alert.alert('Success', `${key} has been deleted from local storage.`);
-  //     } else {
-  //       Alert.alert('Not Found', `${key} does not exist in local storage.`);
-  //     }
-  //   } catch (error) {
-  //     console.error('Error deleting data from AsyncStorage:', error);
-  //     Alert.alert('Error', 'Failed to delete data from local storage.');
-  //   }
-  // }
+  const deleteDataFromLocalStorage = async (key) => {
+    try {
+      const data = await AsyncStorage.getItem(key);
+      if (data !== null) {
+        await AsyncStorage.removeItem(key);
+        console.log(`${key} has been removed from local storage.`);
+        Alert.alert('Success', `${key} has been deleted from local storage.`);
+      } else {
+        Alert.alert('Not Found', `${key} does not exist in local storage.`);
+      }
+    } catch (error) {
+      console.error('Error deleting data from AsyncStorage:', error);
+      Alert.alert('Error', 'Failed to delete data from local storage.');
+    }
+  }
 
+  const getImages = async() => {
+    const getImageData = await AsyncStorage.getItem('imagesData');
+    console.log("local images data : ", getImageData);
+  }
 
   const getUser = async () => {
     try {
@@ -70,6 +77,7 @@ const HomeScreen = ({ navigation }) => {
         const parsedTitle = JSON.parse(titleData);
         const titlesArray = Array.isArray(parsedTitle) ? parsedTitle : [parsedTitle];
         setLocalTitles(titlesArray);
+        setIsFilterApplied(false);
       }
     } catch (error) {
       console.log("Error retrieving title:", error);
@@ -144,6 +152,7 @@ const HomeScreen = ({ navigation }) => {
       await fetchComplaints(user.user_id, searchQuery, startDate, endDate, filterType);
     }
     setRefreshing(false);
+    setIsFilterApplied(false);
   };
 
   const handleSearch = () => {
@@ -171,6 +180,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleFilterSubmit = async () => {
+    setIsFilterApplied(true);
     if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
       Alert.alert("Error", "Start date cannot be later than end date.");
       setEndDate('');
@@ -199,6 +209,11 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     getUser();
     getComplaintsTitlesLocal();
+    // deleteDataFromLocalStorage('titleData');
+    // deleteDataFromLocalStorage('imagesData');
+    // deleteDataFromLocalStorage('complaintDetailData');
+    // showDate();
+    getImages();
   }, []);
 
   return (
@@ -248,47 +263,60 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Complaints List */}
-      <View style={styles.listContainer}>
-        {localTitles && localTitles.length > 0 ? (
-          localTitles.map((title, index) => (
-            <TouchableOpacity key={index} style={styles.card}>
-              <View style={styles.cardContent}>
-                <Text style={styles.titleText}>{title.title}</Text>
-                {/* <Icon name="" size={20} color="#4CAF50" style={styles.icon} /> */}
-              </View>
-              <Text>Pending...</Text>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <Text style={styles.noDataText}>No pending complaints available.</Text>
-        )}
-      </View>
-
-      <View style={styles.complaintsContainer}>
-        {complaints.length > 0 ? (
-          [...complaints]
-            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-            .reverse() // Reverse to get latest first
-            .map((complaint) => (
+      {/* Default Data Section */}
+      {!isFilterApplied && (
+        <View style={styles.listContainer}>
+          {localTitles && localTitles.length > 0 ? (
+            localTitles.map((title, index) => (
               <TouchableOpacity
-                key={complaint.complaint_id}
-                onPress={() => navigation.navigate('Detail', { complaint_id: complaint.complaint_id })}
-              >
-                <View style={styles.complaintBox}>
-                  <Ionicons name="document-text" size={50} color="#3b82f6" />
-                  <Text style={styles.complaintTitle}>{complaint.title}</Text>
-                  <Text style={styles.complaintTime}>
-                    {format(new Date(complaint.created_at), 'MMM dd, yyyy')}
-                  </Text>
-                </View>
-              </TouchableOpacity>
+                  key={index}
+                  onPress={() =>
+                    navigation.navigate('Detail', { complaint_id: title.complaint_id })
+                  }
+                >
+                  <View style={styles.complaintBox}>
+                    <Ionicons name="document-text" size={50} color="#3b82f6" />
+                    <Text style={styles.complaintTitle}>{title.title}</Text>
+                    <Text style={styles.complaintTime}>
+                      {format(new Date(title.created_at), 'MMM dd, yyyy')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
             ))
-        ) : (
-          <Text style={styles.noComplaintsText}>No complaints available.</Text>
-        )}
-      </View>
+          ) : (
+            <Text style={styles.noDataText}>No pending complaints available.</Text>
+          )}
+        </View>
+      )}
 
+      {/* Filtered Server Data Section */}
+      {isFilterApplied && (
+        <View style={styles.complaintsContainer}>
+          {complaints.length > 0 ? (
+            [...complaints]
+              .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+              .reverse()
+              .map((complaint) => (
+                <TouchableOpacity
+                  key={complaint.complaint_id}
+                  onPress={() =>
+                    navigation.navigate('Detail', { complaint_id: complaint.complaint_id })
+                  }
+                >
+                  <View style={styles.complaintBox}>
+                    <Ionicons name="document-text" size={50} color="#3b82f6" />
+                    <Text style={styles.complaintTitle}>{complaint.title}</Text>
+                    <Text style={styles.complaintTime}>
+                      {format(new Date(complaint.created_at), 'MMM dd, yyyy')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+          ) : (
+            <Text style={styles.noComplaintsText}>No complaints available.</Text>
+          )}
+        </View>
+      )}
       {/* Filter Modal */}
       <Modal
         transparent={true}

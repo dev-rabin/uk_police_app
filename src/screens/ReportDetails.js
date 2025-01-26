@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Image, Modal } fr
 import api from '../api';
 import { format } from 'date-fns';
 
-const image_url = "http://192.168.1.6:4000/api";
+const image_url = "http://192.168.1.2:4000/api";
 
 const ReportDetails = ({ route, navigation }) => {
   const [complaintDetail, setComplaintDetail] = useState(null);

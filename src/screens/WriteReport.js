@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,7 +15,6 @@ import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/index';
-import { CommonActions } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
 const WriteReport = ({ route }) => {
@@ -27,10 +26,17 @@ const WriteReport = ({ route }) => {
   const [images, setImages] = useState([]);
   const [complaintId, setComplaintId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [complaintDetailId, setComplaintDetailId] = useState(null);
 
   const generateComplaintId = () => {
     return 'CMP' + Date.now();
   };
+    const showDate = () => {
+      const created_at = Date.now();
+      const date = new Date(created_at);
+      const sqlDate = date.toISOString().slice(0, 19).replace('T', ' ');
+      return sqlDate;
+    };
 
   const saveToLocalStorage = async (key, data) => {
     try {
@@ -61,26 +67,9 @@ const WriteReport = ({ route }) => {
     }
   };
 
-  const removeSyncedDataFromStorage = async (complaint_id) => {
-    try {
-      const titleData = JSON.parse(await AsyncStorage.getItem('titleData')) || [];
-      const detailData = JSON.parse(await AsyncStorage.getItem('complaintDetailData')) || [];
-      const imagesData = JSON.parse(await AsyncStorage.getItem('imagesData')) || [];
-
-      const updatedTitles = titleData.filter((item) => item.complaint_id !== complaint_id);
-      const updatedDetails = detailData.filter((item) => item.complaint_id !== complaint_id);
-      const updatedImages = imagesData.filter((item) => item.complaint_detail_id !== complaint_id);
-
-      await AsyncStorage.setItem('titleData', JSON.stringify(updatedTitles));
-      await AsyncStorage.setItem('complaintDetailData', JSON.stringify(updatedDetails));
-      await AsyncStorage.setItem('imagesData', JSON.stringify(updatedImages));
-    } catch (error) {
-      console.error('Error removing synced data from local storage:', error);
-    }
-  };
 
   const syncPendingData = async () => {
-    setLoading(true); // Start loading
+    setLoading(true);
     try {
       const rawTitleData = await AsyncStorage.getItem('titleData');
       const rawDetailData = await AsyncStorage.getItem('complaintDetailData');
@@ -106,43 +95,38 @@ const WriteReport = ({ route }) => {
 
       for (const titleData of pendingTitles) {
         try {
-          const complaint_id = await handleTitleRegister(titleData.title, titleData.user_id);
+          const complaint_id = await handleTitleRegister(titleData.complaint_id, titleData.title, titleData.user_id, 
+            titleData.created_at);
 
           const detail = pendingDetails.find((d) => d.complaint_id === titleData.complaint_id);
           let complaint_detail_id = null;
 
           if (detail) {
-            complaint_detail_id = await handleComplaintRegister(detail.complaint_detail, complaint_id);
+            complaint_detail_id = await handleComplaintRegister(detail.complaint_detail_id, detail.description, complaint_id, 
+              detail.created_at);
           }
 
-          const imagesToUpload = pendingImages.filter((img) => img.complaint_detail_id === titleData.complaint_id);
-          for (const img of imagesToUpload) {
-            await handleImageUpload(complaint_detail_id, img.url);
+          // const imagesToUpload = pendingImages.filter((img) => img.complaint_detail_id === titleData.complaint_id);
+          // console.log("imagesToUpload",imagesToUpload);
+          console.log("pending images : ", pendingImages);
+          
+          for (const img of pendingImages) {
+            await handleImageUpload(img.image_id,img.complaint_detail_id, img.url,img.created_at);
           }
-
-          await removeSyncedDataFromStorage(titleData.complaint_id);
         } catch (error) {
           console.error('Error syncing data for complaint ID:', titleData.complaint_id, error);
         }
       }
-
-      Alert.alert('Success', 'All pending complaints have been synced.');
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'Home' }],
-        })
-      );
     } catch (error) {
       console.error('Error syncing data:', error);
     } finally {
-      setLoading(false); // End loading
+      setLoading(false);
     }
   };
 
-  const handleTitleRegister = async (title, user_id) => {
+  const handleTitleRegister = async (complaint_id,title, user_id, created_at) => {
     try {
-      const response = await api.post('/add-complaint', { title, user_id });
+      const response = await api.post('/add-complaint', { complaint_id, title, user_id, created_at });
       return response.data.data; // complaint_id
     } catch (error) {
       console.error('Error registering title:', error);
@@ -150,9 +134,9 @@ const WriteReport = ({ route }) => {
     }
   };
 
-  const handleComplaintRegister = async (description, complaint_id) => {
+  const handleComplaintRegister = async (complaint_detail_id, description, complaint_id, created_at) => {
     try {
-      const response = await api.post('/add-complaint-detail', { description, complaint_id });
+      const response = await api.post('/add-complaint-detail', {complaint_detail_id, description, complaint_id ,created_at});
       return response.data.data; // complaint_detail_id
     } catch (error) {
       console.error('Error registering complaint details:', error);
@@ -160,20 +144,24 @@ const WriteReport = ({ route }) => {
     }
   };
 
-  const handleImageUpload = async (complaint_detail_id, imageUri) => {
+  const handleImageUpload = async (image_id, complaint_detail_id, imageUri, created_at) => {
     try {
       const formData = new FormData();
       const imageName = imageUri.split('/').pop();
+      formData.append('image_id', image_id);
       formData.append('complaint_detail_id', complaint_detail_id);
       formData.append('url', {
         uri: imageUri,
         type: 'image/jpeg',
         name: imageName,
       });
+      formData.append('created_at',created_at);
 
       await api.post('/add-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      console.log("Form Data of images : ", formData);
+      
     } catch (error) {
       console.error('Error uploading image:', error);
       throw error;
@@ -197,26 +185,42 @@ const WriteReport = ({ route }) => {
     try {
       if (step === 1) {
         const id = generateComplaintId();
+        const created_date = showDate();
         setComplaintId(id);
-        const titleData = { title, complaint_id: id, user_id };
+        const titleData = { 
+          complaint_id: id, 
+          title, 
+          user_id,
+          created_at : created_date, 
+        };
         await saveToLocalStorage('titleData', titleData);
+        console.log("Title Data : ", titleData);
         setStep(2);
       } else if (step === 2) {
-        const detailData = { complaint_detail: description, complaint_id: complaintId };
+        const detail_id = generateComplaintId();
+        setComplaintDetailId(detail_id);
+        const detailData = { 
+         complaint_detail_id : detail_id,
+          description, 
+          complaint_id: complaintId ,
+          created_at :showDate()
+        };
         await saveToLocalStorage('complaintDetailData', detailData);
+        console.log("complaintDetail Data : ",detailData);
         setStep(3);
       } else if (step === 3) {
         const imageData = images.map((image, index) => ({
-          complaint_detail_id: complaintId,
+          image_id : generateComplaintId(),
+          complaint_detail_id: complaintDetailId,
           name: `image_${index + 1}`,
           url: image,
+          created_at : showDate()
         }));
         for (const img of imageData) {
           await saveToLocalStorage('imagesData', img);
+          console.log("img : ", img);
         }
-
-        Alert.alert('Success', 'Complaint saved locally.');
-
+        Alert.alert('Success', 'Complaint saved.');
         setTitle('');
         setDescription('');
         setImages([]);
@@ -244,6 +248,10 @@ const WriteReport = ({ route }) => {
     }
   };
 
+  useEffect(()=>{
+    syncPendingData();
+  },[]);
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding">
       <ScrollView contentContainerStyle={styles.scrollViewContainer}>
@@ -267,9 +275,9 @@ const WriteReport = ({ route }) => {
               <Text style={styles.buttonText}>Next</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.button} onPress={syncPendingData}>
+            {/* <TouchableOpacity style={styles.button} onPress={syncPendingData}>
               <Text style={styles.buttonText}>Sync Data</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         )}
 

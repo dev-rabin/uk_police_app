@@ -29,7 +29,6 @@ const AddMoreDetail = ({ route, navigation }) => {
     }
   };
 
-  // Submit complaint details to the backend
   const handleComplaintDetailsSubmit = async (description) => {
     try {
       const response = await api.post('/add-complaint-detail', {
@@ -47,15 +46,13 @@ const AddMoreDetail = ({ route, navigation }) => {
     const formData = new FormData();
     formData.append('complaint_detail_id', complaint_detail_id);
   
-    // Make sure image is appended correctly
-    const imageName = imageUri.split('/').pop(); // Extract the filename from the URI
-    const imageType = 'image/jpeg';  // Ensure you set the correct MIME type
+    const imageName = imageUri.split('/').pop();
+    const imageType = 'image/jpeg'; 
   
-    // Append the image as a file object
     formData.append('url', {
       uri: imageUri,
       type: imageType,
-      name: imageName,  // Ensure name is passed along with the file
+      name: imageName,
     });
   
     try {
@@ -63,7 +60,7 @@ const AddMoreDetail = ({ route, navigation }) => {
       
       const response = await api.post('/add-image', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',  // Ensure correct content type
+          'Content-Type': 'multipart/form-data',
         },
       });
       return response.data;
@@ -73,7 +70,6 @@ const AddMoreDetail = ({ route, navigation }) => {
     }
   };
 
-  // Pick images and update the state
   const handleImagePick = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -83,25 +79,21 @@ const AddMoreDetail = ({ route, navigation }) => {
     });
 
     if (!result.cancelled) {
-      setImages((prevImages) => [...prevImages, ...result.assets.map((asset) => asset.uri)]);  // Update state with new images
+      setImages((prevImages) => [...prevImages, ...result.assets.map((asset) => asset.uri)]);
     } else {
       console.log('User canceled image picker');
     }
   };
 
-  // Handle form submission
   const handleSubmit = async () => {
     if (!complaint.trim()) {
       Alert.alert('Error', 'Please enter your complaint.');
       return;
     }
-
+  
     try {
-      // Step 1: Submit complaint details
       const complaintDetail = await handleComplaintDetailsSubmit(complaint);
       const complaint_detail_id = complaintDetail;
-
-      // Step 2: If images are selected, upload each image
       if (images.length > 0) {
         for (const url of images) {
           await handleImageUpload(complaint_detail_id, url);
@@ -110,14 +102,18 @@ const AddMoreDetail = ({ route, navigation }) => {
       } else {
         Alert.alert('Success', 'Complaint added successfully without image.');
       }
-
-      // Reset fields
       setComplaint('');
       setImages([]);
+      navigation.reset({
+        index: 0, 
+        routes: [{ name: 'Home' }],
+      });
+  
     } catch (error) {
       Alert.alert('Error', 'There was an error while submitting the complaint. Please try again.');
     }
   };
+  
 
   return (
     <View style={styles.container}>
@@ -153,7 +149,9 @@ const AddMoreDetail = ({ route, navigation }) => {
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.buttonContainer} />
       </ScrollView>
-
+      {/* <TouchableOpacity style={styles.button}  onPress={()=> navigation.navigate("Speech")}>
+        <Text style={styles.buttonText}>Speech to text</Text>
+      </TouchableOpacity> */}
       <TouchableOpacity style={styles.button} onPress={handleSubmit}>
         <Text style={styles.buttonText}>Add</Text>
       </TouchableOpacity>

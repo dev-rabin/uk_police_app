@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../api';
 import { format } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
+import NetworkStatus from '../network/network';
 
 const HomeScreen = ({ navigation }) => {
   const [complaints, setComplaints] = useState([]);
@@ -15,8 +17,39 @@ const HomeScreen = ({ navigation }) => {
   const [endDate, setEndDate] = useState('');
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
   const [filterType, setFilterType] = useState('');
+  const [isStartDatePickerVisible, setStartDatePickerVisible] = useState(false);
+  const [isEndDatePickerVisible, setEndDatePickerVisible] = useState(false);
+  const [localTitles, setLocalTitles] = useState([]);
 
-  // Fetch user information from AsyncStorage
+  const [filterDate, setFilterDate] = useState('');
+
+  const [isFilterDatePickerVisible, setIsFilterDatePickerVisible] = useState(false);
+
+  const showFilterDatePicker = () => setIsFilterDatePickerVisible(true);
+  const hideFilterDatePicker = () => setIsFilterDatePickerVisible(false);
+
+  const handleFilterDateConfirm = (date) => {
+    setFilterDate(format(date, 'yyyy-MM-dd'));
+    hideFilterDatePicker();
+  };
+
+  // const deleteDataFromLocalStorage = async (key) => {
+  //   try {
+  //     const data = await AsyncStorage.getItem(key);
+  //     if (data !== null) {
+  //       await AsyncStorage.removeItem(key);
+  //       console.log(`${key} has been removed from local storage.`);
+  //       Alert.alert('Success', `${key} has been deleted from local storage.`);
+  //     } else {
+  //       Alert.alert('Not Found', `${key} does not exist in local storage.`);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error deleting data from AsyncStorage:', error);
+  //     Alert.alert('Error', 'Failed to delete data from local storage.');
+  //   }
+  // }
+
+
   const getUser = async () => {
     try {
       const userData = await AsyncStorage.getItem('user');
@@ -30,8 +63,20 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // Fetch complaints, passing user ID and optional filters
-  const fetchComplaints = async (user_id, search = '', startDate = '', endDate = '', filterType = '') => {
+  const getComplaintsTitlesLocal = async () => {
+    try {
+      const titleData = await AsyncStorage.getItem('titleData');
+      if (titleData) {
+        const parsedTitle = JSON.parse(titleData);
+        const titlesArray = Array.isArray(parsedTitle) ? parsedTitle : [parsedTitle];
+        setLocalTitles(titlesArray);
+      }
+    } catch (error) {
+      console.log("Error retrieving title:", error);
+    }
+  };
+
+  const fetchComplaints = async (user_id, search = '', startDate = '', endDate = '', filterType = '', filterDate = '') => {
     try {
       const response = await api.get("/filter", {
         params: {
@@ -39,18 +84,19 @@ const HomeScreen = ({ navigation }) => {
           search,
           startDate,
           endDate,
-          filterType
+          filterType,
+          filterDate
         }
       });
       const responseData = await response.data.data;
+      console.log("Length of the filter response : ", responseData.length);
       setComplaints(responseData);
     } catch (error) {
       console.error("Error fetching complaints:", error.message);
       Alert.alert("Error", "Failed to load complaints. Please try again later.");
     }
   };
-
-  // Logout handler
+  
   const handleLogout = async () => {
     Alert.alert(
       "Confirm Logout",
@@ -76,11 +122,33 @@ const HomeScreen = ({ navigation }) => {
     );
   };
 
+  const showStartDatePicker = () => setStartDatePickerVisible(true);
+  const hideStartDatePicker = () => setStartDatePickerVisible(false);
+
+  const showEndDatePicker = () => setEndDatePickerVisible(true);
+  const hideEndDatePicker = () => setEndDatePickerVisible(false);
+
+  const handleStartDateConfirm = (date) => {
+    setStartDate(format(date, 'yyyy-MM-dd'));
+    hideStartDatePicker();
+  };
+
+  const handleEndDateConfirm = (date) => {
+    setEndDate(format(date, 'yyyy-MM-dd'));
+    hideEndDatePicker();
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    if (user) {
+      await fetchComplaints(user.user_id, searchQuery, startDate, endDate, filterType);
+    }
+    setRefreshing(false);
+  };
 
   const handleSearch = () => {
     setSearchModalVisible(true);
   };
-
 
   const handleSearchSubmit = async () => {
     if (searchQuery.trim()) {
@@ -98,24 +166,15 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    if (user) {
-      await fetchComplaints(user.user_id, searchQuery, startDate, endDate, filterType);
-    }
-    setRefreshing(false);
-  };
-
-
   const handleFilter = () => {
     setFilterModalVisible(true);
   };
 
-
   const handleFilterSubmit = async () => {
     if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
       Alert.alert("Error", "Start date cannot be later than end date.");
+      setEndDate('');
+      setStartDate('');
       return;
     }
 
@@ -124,7 +183,12 @@ const HomeScreen = ({ navigation }) => {
     }
 
     try {
-      await fetchComplaints(user.user_id, searchQuery, startDate, endDate, filterType);
+      await fetchComplaints(user.user_id, searchQuery, startDate, endDate, filterType, filterDate);
+      setStartDate('');
+      setEndDate('');
+      setFilterType('');
+      setFilterDate('');
+
       setFilterModalVisible(false);
     } catch (error) {
       console.error("Error applying filter:", error.message);
@@ -134,6 +198,7 @@ const HomeScreen = ({ navigation }) => {
 
   useEffect(() => {
     getUser();
+    getComplaintsTitlesLocal();
   }, []);
 
   return (
@@ -145,6 +210,7 @@ const HomeScreen = ({ navigation }) => {
     >
       {/* Logout Button */}
       <View style={styles.logoutButtonContainer}>
+        <NetworkStatus />
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}><Ionicons name='log-out' size={24} /></Text>
         </TouchableOpacity>
@@ -183,6 +249,22 @@ const HomeScreen = ({ navigation }) => {
       </View>
 
       {/* Complaints List */}
+      <View style={styles.listContainer}>
+        {localTitles && localTitles.length > 0 ? (
+          localTitles.map((title, index) => (
+            <TouchableOpacity key={index} style={styles.card}>
+              <View style={styles.cardContent}>
+                <Text style={styles.titleText}>{title.title}</Text>
+                {/* <Icon name="" size={20} color="#4CAF50" style={styles.icon} /> */}
+              </View>
+              <Text>Pending...</Text>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <Text style={styles.noDataText}>No pending complaints available.</Text>
+        )}
+      </View>
+
       <View style={styles.complaintsContainer}>
         {complaints.length > 0 ? (
           [...complaints]
@@ -199,7 +281,6 @@ const HomeScreen = ({ navigation }) => {
                   <Text style={styles.complaintTime}>
                     {format(new Date(complaint.created_at), 'MMM dd, yyyy')}
                   </Text>
-
                 </View>
               </TouchableOpacity>
             ))
@@ -207,7 +288,6 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.noComplaintsText}>No complaints available.</Text>
         )}
       </View>
-
 
       {/* Filter Modal */}
       <Modal
@@ -219,18 +299,21 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Filter Complaints by Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Start Date (YYYY-MM-DD)"
-              value={startDate}
-              onChangeText={setStartDate}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="End Date (YYYY-MM-DD)"
-              value={endDate}
-              onChangeText={setEndDate}
-            />
+
+            {/* Start Date Picker */}
+            <TouchableOpacity onPress={showStartDatePicker}>
+              <Text style={styles.input}>{startDate || "Select Start Date"}</Text>
+            </TouchableOpacity>
+
+            {/* End Date Picker */}
+            <TouchableOpacity onPress={showEndDatePicker}>
+              <Text style={styles.input}>{endDate || "Select End Date"}</Text>
+            </TouchableOpacity>
+
+            {/* Filter Date Picker */}
+            {/* <TouchableOpacity onPress={() => setIsFilterDatePickerVisible(true)}>
+              <Text style={styles.input}>{filterDate || "Select Filter Date"}</Text>
+            </TouchableOpacity> */}
 
             {/* Filter Type */}
             <Text style={styles.filterLabel}>Filter by Type</Text>
@@ -250,6 +333,29 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </Modal>
 
+      {/* Start Date Picker Modal */}
+      <DateTimePickerModal
+        isVisible={isStartDatePickerVisible}
+        mode="date"
+        onConfirm={handleStartDateConfirm}
+        onCancel={hideStartDatePicker}
+      />
+
+      {/* End Date Picker Modal */}
+      <DateTimePickerModal
+        isVisible={isEndDatePickerVisible}
+        mode="date"
+        onConfirm={handleEndDateConfirm}
+        onCancel={hideEndDatePicker}
+      />
+{/* 
+      <DateTimePickerModal
+        isVisible={isFilterDatePickerVisible}
+        mode="date"
+        onConfirm={handleFilterDateConfirm}
+        onCancel={hideFilterDatePicker}
+      /> */}
+
 
       {/* Search Modal */}
       <Modal
@@ -268,25 +374,25 @@ const HomeScreen = ({ navigation }) => {
               onChangeText={setSearchQuery}
               onSubmitEditing={handleSearchSubmit}
             />
-
             <View style={styles.buttonContainer}>
               <Button title="Search" onPress={handleSearchSubmit} />
             </View>
-
             <View style={styles.buttonContainer}>
               <Button title="Cancel" onPress={() => setSearchModalVisible(false)} color="red" />
             </View>
           </View>
         </View>
       </Modal>
-
     </ScrollView>
   );
 };
 
+
+
+
 const styles = StyleSheet.create({
   container: { padding: 15, backgroundColor: '#f4f7fc' },
-  logoutButtonContainer: { flexDirection: 'row', justifyContent: 'flex-end' },
+  logoutButtonContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: "center" },
   logoutButton: { padding: 10 },
   logoutButtonText: { fontSize: 22, color: '#3b82f6' },
   profileSection: { flexDirection: 'row', marginBottom: 20, padding: 10, borderRadius: 8, backgroundColor: 'white', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
@@ -298,7 +404,7 @@ const styles = StyleSheet.create({
   writeButtonText: { textAlign: 'center', color: 'white', fontSize: 16, fontWeight: 'bold' },
   featureButtons: { flexDirection: 'row', justifyContent: 'space-around' },
   featureButtonIcon: { margin: 10, color: '#3b82f6' },
-  complaintsContainer: { marginVertical: 3 },
+  complaintsContainer: { marginTop: 3, marginBottom: 20 },
   complaintBox: { flexDirection: 'row', alignItems: 'center', padding: 15, marginBottom: 10, backgroundColor: '#ffffff', borderRadius: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
   complaintTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#333' },
   complaintTime: { fontSize: 14, color: 'gray' },
@@ -312,6 +418,39 @@ const styles = StyleSheet.create({
   apply: { marginBottom: 10 },
   buttonContainer: {
     marginTop: 15,
+  },
+  listContainer: {
+    padding: 15,
+    backgroundColor: '#f9f9f9',
+  },
+  card: {
+    backgroundColor: '#fff',
+    padding: 15,
+    marginBottom: 15,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3, // for Android
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  titleText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  icon: {
+    marginLeft: 10,
+  },
+  noDataText: {
+    textAlign: 'center',
+    color: '#888',
+    fontSize: 16,
   },
 });
 

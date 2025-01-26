@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Image, Modal } from 'react-native';
 import api from '../api';
+import { format } from 'date-fns';
 
-const image_url = "http://192.168.1.7:4000/api";
+const image_url = "http://192.168.1.6:4000/api";
 
 const ReportDetails = ({ route, navigation }) => {
   const [complaintDetail, setComplaintDetail] = useState(null);
@@ -11,6 +12,7 @@ const ReportDetails = ({ route, navigation }) => {
   const { complaint_id } = route.params;
 
   const fetchComplaintDetails = async (complaint_id) => {
+    console.log(`Fetching complaint details for complaint_id: ${complaint_id}`);
     try {
       const response = await api.get(`/complaint/${complaint_id}`);
       const responseData = response.data.data;
@@ -22,16 +24,17 @@ const ReportDetails = ({ route, navigation }) => {
 
   useEffect(() => {
     if (complaint_id) {
+      console.log('Complaint ID:', complaint_id);
       fetchComplaintDetails(complaint_id);
     }
   }, [complaint_id]);
-
   const handleImagePress = (imageUri) => {
     setSelectedImage(imageUri);
     setIsModalVisible(true);
   };
 
   const closeModal = () => {
+    console.log('Closing modal');
     setIsModalVisible(false);
     setSelectedImage(null);
   };
@@ -42,45 +45,34 @@ const ReportDetails = ({ route, navigation }) => {
         {complaintDetail ? (
           <>
             <Text style={styles.detailTitle}>{complaintDetail.title}</Text>
-            {/* Loop through each description */}
-            {complaintDetail.details?.map((detail, index) => {
-              const zonedDate = new Date(detail.created_at);
-              const ukTime = new Intl.DateTimeFormat('en-GB', {
-                timeZone: 'Europe/London',
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: 'numeric',
-                hour12: true,
-              }).format(zonedDate);
+            {complaintDetail.details?.map((detail, index) => (
+              <View key={index} style={styles.detailBox}>
+                <Text style={styles.dateText}>
+                  Created On: {format(new Date(detail.created_at), 'MMM dd, yyyy hh:mm a')}
+                </Text>
 
-              return (
-                <View key={index} style={styles.detailBox}>
-                  <Text style={styles.dateText}>Created On: {ukTime}</Text>
-                  <Text style={styles.detailContent}>{detail.description}</Text>
-
-                  {/* Render images if available */}
-                  {detail.images?.length > 0 && (
-                    <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={styles.imagesContainer}>
-                      {detail.images.map((image, imgIndex) => (
+                <Text style={styles.detailContent}>{detail.description}</Text>
+                {detail.images?.length > 0 && (
+                  <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={styles.imagesContainer}>
+                    {detail.images.map((image, imgIndex) => {
+                      const imageUri = `${image_url}${image.url}`;
+                      return (
                         <TouchableOpacity
                           key={imgIndex}
-                          onPress={() => handleImagePress(`${image_url}${image.url}`)}
+                          onPress={() => handleImagePress(imageUri)}
                           style={styles.imageWrapper}
                         >
                           <Image
-                            source={{ uri: `${image_url}${image.url}` }}
+                            source={{ uri: imageUri }}
                             style={styles.image}
                           />
                         </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  )}
-
-                </View>
-              );
-            })}
+                      );
+                    })}
+                  </ScrollView>
+                )}
+              </View>
+            ))}
           </>
         ) : (
           <Text>No records found!</Text>
@@ -102,7 +94,10 @@ const ReportDetails = ({ route, navigation }) => {
       {/* Floating Button */}
       <TouchableOpacity
         style={styles.floatingButton}
-        onPress={() => navigation.navigate("Add More", { complaint_id })}
+        onPress={() => {
+          console.log('Navigating to Add More Detail screen');
+          navigation.navigate("Add More", { complaint_id });
+        }}
       >
         <Text style={styles.buttonText}>Add More Detail</Text>
       </TouchableOpacity>

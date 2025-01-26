@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Image, Modal } from 'react-native';
 import api from '../api';
 import { format } from 'date-fns';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const image_url = "http://192.168.1.2:4000/api";
 
@@ -10,24 +11,83 @@ const ReportDetails = ({ route, navigation }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const { complaint_id } = route.params;
+  const [localDetails, setLocalDetails] = useState(null);
+  const [localImages, setLocalImages] = useState(null);
+  const [complaintDetailId, setComplaintDetailId] = useState(null); // To hold the complaint_detail_id
 
   const fetchComplaintDetails = async (complaint_id) => {
-    console.log(`Fetching complaint details for complaint_id: ${complaint_id}`);
     try {
       const response = await api.get(`/complaint/${complaint_id}`);
-      const responseData = response.data.data;
-      setComplaintDetail(responseData);
+      if (response?.data?.data) {
+        const responseData = response.data.data;
+        setComplaintDetail(responseData);
+        setComplaintDetailId(responseData.complaint_detail_id);
+      } else {
+        console.log("No data in response");
+      }
     } catch (error) {
       console.log("Error fetching details of complaint:", error);
     }
   };
 
-  useEffect(() => {
-    if (complaint_id) {
-      console.log('Complaint ID:', complaint_id);
-      fetchComplaintDetails(complaint_id);
+  const getLocalDetails = async () => {
+    try {
+      const localDetails = await AsyncStorage.getItem("complaintDetailData");
+      console.log("localDetails", localDetails);
+      
+      if (localDetails) {
+        const parsedDetails = JSON.parse(localDetails);
+        if (Array.isArray(parsedDetails)) {
+          const filteredDetail = parsedDetails.find((item) => item.complaint_id === complaint_id);
+          if (filteredDetail) {
+            setComplaintDetailId(filteredDetail.complaint_detail_id);
+            setLocalDetails(filteredDetail);
+          } else {
+            console.log("No matching details found locally.");
+          }
+        } else if (parsedDetails && typeof parsedDetails === 'object') {
+          if (parsedDetails.complaint_id === complaint_id) {
+            setComplaintDetailId(parsedDetails.complaint_detail_id);
+            setLocalDetails(parsedDetails);
+          } else {
+            console.log("No matching details found locally.");
+          }
+        } else {
+          console.log("The stored data is not in the expected format.");
+        }
+      } else {
+        console.log("No local details found.");
+      }
+    } catch (error) {
+      console.log("Error fetching local complaint details:", error);
     }
-  }, [complaint_id]);
+  };
+
+
+
+  const getLocalImages = async (complaint_detail_id) => {
+    try {
+      const localImages = await AsyncStorage.getItem("imagesData");
+      if (localImages) {
+        const imagesArray = JSON.parse(localImages);
+        console.log("Stored images in AsyncStorage:", imagesArray); // Log the fetched images
+        if (Array.isArray(imagesArray)) {
+          const filteredImages = imagesArray.filter(
+            (image) => image.complaint_detail_id === complaint_detail_id
+          );
+          setLocalImages(filteredImages);
+        } else {
+          console.log("The fetched data is not an array:", imagesArray);
+        }
+      } else {
+        console.log("No images found in local storage.");
+      }
+    } catch (error) {
+      console.log("Error fetching local images:", error);
+    }
+  };
+
+
   const handleImagePress = (imageUri) => {
     setSelectedImage(imageUri);
     setIsModalVisible(true);
@@ -39,21 +99,43 @@ const ReportDetails = ({ route, navigation }) => {
     setSelectedImage(null);
   };
 
+  useEffect(() => {
+    if (complaint_id) {
+      console.log('Complaint ID:', complaint_id);
+      fetchComplaintDetails(complaint_id);
+      getLocalDetails();
+    }
+  }, [complaint_id]);
+
+  useEffect(() => {
+    console.log("complaint_detail_id passed to getLocalImages:", complaintDetailId);
+    if (complaintDetailId) {
+      getLocalImages(complaintDetailId);
+    }
+  }, [complaintDetailId]);
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
         {complaintDetail ? (
           <>
-            <Text style={styles.detailTitle}>{complaintDetail.title}</Text>
+            {/* Render API Data */}
+            <Text style={styles.detailTitle}>{complaintDetail.title || "Complaint Details"}</Text>
+            <Text style={styles.dateText}>
+              {/* Created On: {format(new Date(complaintDetail.created_at), 'MMM dd, yyyy hh:mm a')} */}
+            </Text>
             {complaintDetail.details?.map((detail, index) => (
               <View key={index} style={styles.detailBox}>
                 <Text style={styles.dateText}>
-                  Created On: {format(new Date(detail.created_at), 'MMM dd, yyyy hh:mm a')}
+                  Detail Created On: {format(new Date(detail.created_at), 'MMM dd, yyyy hh:mm a')}
                 </Text>
-
                 <Text style={styles.detailContent}>{detail.description}</Text>
                 {detail.images?.length > 0 && (
-                  <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={styles.imagesContainer}>
+                  <ScrollView
+                    horizontal={true}
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.imagesContainer}
+                  >
                     {detail.images.map((image, imgIndex) => {
                       const imageUri = `${image_url}${image.url}`;
                       return (
@@ -62,10 +144,7 @@ const ReportDetails = ({ route, navigation }) => {
                           onPress={() => handleImagePress(imageUri)}
                           style={styles.imageWrapper}
                         >
-                          <Image
-                            source={{ uri: imageUri }}
-                            style={styles.image}
-                          />
+                          <Image source={{ uri: imageUri }} style={styles.image} />
                         </TouchableOpacity>
                       );
                     })}
@@ -73,6 +152,37 @@ const ReportDetails = ({ route, navigation }) => {
                 )}
               </View>
             ))}
+          </>
+        ) : localDetails ? (
+          <>
+            {/* Render Local Data */}
+            <Text style={styles.detailTitle}>{localDetails.title || "Complaint Details"}</Text>
+            <Text style={styles.dateText}>
+              {/* Created On: {format(new Date(localDetails.created_at), 'MMM dd, yyyy hh:mm a')} */}
+            </Text>
+            <View style={styles.detailBox}>
+              <Text style={styles.dateText}>
+                Detail Created On: {format(new Date(localDetails.created_at), 'MMM dd, yyyy hh:mm a')}
+              </Text>
+              <Text style={styles.detailContent}>{localDetails.description}</Text>
+              {localImages?.length > 0 && (
+                <ScrollView
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.imagesContainer}
+                >
+                  {localImages.map((image, imgIndex) => (
+                    <TouchableOpacity
+                      key={imgIndex}
+                      onPress={() => handleImagePress(image.url)} // Assuming local images have 'uri'
+                      style={styles.imageWrapper}
+                    >
+                      <Image source={{ uri: image.url }} style={styles.image} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
           </>
         ) : (
           <Text>No records found!</Text>
@@ -123,10 +233,9 @@ const styles = StyleSheet.create({
   dateText: { fontSize: 12, color: '#555', marginVertical: 5 },
 
   // Image Styles
-  imagesContainer: { flexDirection: 'row', marginTop: 10, overflow: "scroll", },
+  imagesContainer: { flexDirection: 'row', marginTop: 10 },
   imageWrapper: { marginRight: 10, marginBottom: 10 },
   image: { width: 80, height: 80 },
-  imageText: { fontSize: 12, textAlign: 'center', marginTop: 5, color: '#555' },
 
   // Modal Styles
   modalContainer: {

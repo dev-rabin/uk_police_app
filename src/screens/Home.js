@@ -7,8 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import NetworkStatus from '../network/network';
 
-const HomeScreen = ({ navigation, route }) => {
-  
+const HomeScreen = ({ navigation }) => {
+
   const [complaints, setComplaints] = useState([]);
   const [user, setUser] = useState(null);
   const [isSearchModalVisible, setSearchModalVisible] = useState(false);
@@ -24,7 +24,7 @@ const HomeScreen = ({ navigation, route }) => {
 
   const [filterDate, setFilterDate] = useState('');
 
-  const [isFilterApplied, setIsFilterApplied] = useState(false); 
+  const [isFilterApplied, setIsFilterApplied] = useState(false);
 
   const [isFilterDatePickerVisible, setIsFilterDatePickerVisible] = useState(false);
 
@@ -36,12 +36,16 @@ const HomeScreen = ({ navigation, route }) => {
     hideFilterDatePicker();
   };
 
+  const getComplaintsLocal = async () => {
+    const details = await AsyncStorage.getItem('complaintDetailData');
+    console.log("local complaint details : ",details );
+  }
+
   const deleteDataFromLocalStorage = async (key) => {
     try {
       const data = await AsyncStorage.getItem(key);
       if (data !== null) {
         await AsyncStorage.removeItem(key);
-        console.log(`${key} has been removed from local storage.`);
         Alert.alert('Success', `${key} has been deleted from local storage.`);
       } else {
         Alert.alert('Not Found', `${key} does not exist in local storage.`);
@@ -52,9 +56,8 @@ const HomeScreen = ({ navigation, route }) => {
     }
   }
 
-  const getImages = async() => {
+  const getImages = async () => {
     const getImageData = await AsyncStorage.getItem('imagesData');
-    console.log("local images data : ", getImageData);
   }
 
   const getUser = async () => {
@@ -104,7 +107,7 @@ const HomeScreen = ({ navigation, route }) => {
       Alert.alert("Error", "Failed to load complaints. Please try again later.");
     }
   };
-  
+
   const handleLogout = async () => {
     Alert.alert(
       "Confirm Logout",
@@ -163,7 +166,7 @@ const HomeScreen = ({ navigation, route }) => {
     if (searchQuery.trim()) {
       try {
         const response = await api.get("/search", { params: { searchTerm: searchQuery } });
-        const responseData = await response.data.data;
+        const responseData = await response.data.data;        
         setComplaints(responseData);
         setSearchModalVisible(false);
       } catch (error) {
@@ -213,6 +216,7 @@ const HomeScreen = ({ navigation, route }) => {
     // deleteDataFromLocalStorage('imagesData');
     // deleteDataFromLocalStorage('complaintDetailData');
     // showDate();
+    getComplaintsLocal();
     getImages();
   }, []);
 
@@ -267,8 +271,10 @@ const HomeScreen = ({ navigation, route }) => {
       {!isFilterApplied && (
         <View style={styles.listContainer}>
           {localTitles && localTitles.length > 0 ? (
-            localTitles.map((title, index) => (
-              <TouchableOpacity
+            localTitles
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) // Sorting by created_at (latest first)
+              .map((title, index) => (
+                <TouchableOpacity
                   key={index}
                   onPress={() =>
                     navigation.navigate('Detail', { complaint_id: title.complaint_id })
@@ -282,11 +288,13 @@ const HomeScreen = ({ navigation, route }) => {
                     </Text>
                   </View>
                 </TouchableOpacity>
-            ))
+              ))
           ) : (
             <Text style={styles.noDataText}>No pending complaints available.</Text>
           )}
         </View>
+
+
       )}
 
       {/* Filtered Server Data Section */}
@@ -376,7 +384,7 @@ const HomeScreen = ({ navigation, route }) => {
         onConfirm={handleEndDateConfirm}
         onCancel={hideEndDatePicker}
       />
-{/* 
+      {/* 
       <DateTimePickerModal
         isVisible={isFilterDatePickerVisible}
         mode="date"

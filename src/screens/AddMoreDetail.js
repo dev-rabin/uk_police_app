@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,11 +12,13 @@ import {
   Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import * as ImagePicker from 'expo-image-picker'; 
-import api from '../api';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AddMoreDetail = ({ route, navigation }) => {
   const { complaint_id } = route.params;
+  console.log("add more detail complaint_id : ", complaint_id);
+
   const [complaint, setComplaint] = useState('');
   const [images, setImages] = useState([]);
 
@@ -29,44 +31,41 @@ const AddMoreDetail = ({ route, navigation }) => {
     }
   };
 
-  const handleComplaintDetailsSubmit = async (description) => {
-    try {
-      const response = await api.post('/add-complaint-detail', {
-        complaint_id,
-        description,
-      });
-      return response.data.data;
-    } catch (error) {
-      console.error('Error adding complaint details:', error);
-      throw error;
-    }
+  const showDate = () => {
+    const created_at = Date.now();
+    const date = new Date(created_at);
+    const sqlDate = date.toISOString().slice(0, 19).replace('T', ' ');
+    return sqlDate;
   };
 
-  const handleImageUpload = async (complaint_detail_id, imageUri) => {
-    const formData = new FormData();
-    formData.append('complaint_detail_id', complaint_detail_id);
-  
-    const imageName = imageUri.split('/').pop();
-    const imageType = 'image/jpeg'; 
-  
-    formData.append('url', {
-      uri: imageUri,
-      type: imageType,
-      name: imageName,
-    });
-  
+  const generateComplaintId = () => {
+    return 'CMP' + Date.now();
+  };
+
+  const handleComplaintDetailsSubmit = async () => {
+    const complaintDetailsData = {
+      complaint_detail_id: generateComplaintId(),
+      description: complaint,
+      complaint_id: complaint_id,
+      created_at: showDate(),
+    };
+
     try {
-      console.log("Form Data : ", formData);
-      
-      const response = await api.post('/add-image', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data;
+      await AsyncStorage.setItem('complaintDetailData', JSON.stringify(complaintDetailsData));
+      console.log('Complaint details saved');
     } catch (error) {
-      console.error('Error uploading image:', error.response ? error.response.data : error.message);
-      throw error;
+      console.error('Error saving complaint details:', error);
+    }
+    return complaintDetailsData;
+  };
+
+  const handleImageUpload = async () => {
+    const imagesData = images.map((uri) => ({ uri }));
+    try {
+      await AsyncStorage.setItem('imagesData', JSON.stringify(imagesData));
+      console.log('Images saved');
+    } catch (error) {
+      console.error('Error saving images:', error);
     }
   };
 
@@ -78,7 +77,7 @@ const AddMoreDetail = ({ route, navigation }) => {
       multiple: true,
     });
 
-    if (!result.cancelled) {
+    if (!result.canceled) {
       setImages((prevImages) => [...prevImages, ...result.assets.map((asset) => asset.uri)]);
     } else {
       console.log('User canceled image picker');
@@ -90,30 +89,30 @@ const AddMoreDetail = ({ route, navigation }) => {
       Alert.alert('Error', 'Please enter your complaint.');
       return;
     }
-  
+
     try {
-      const complaintDetail = await handleComplaintDetailsSubmit(complaint);
-      const complaint_detail_id = complaintDetail;
-      if (images.length > 0) {
-        for (const url of images) {
-          await handleImageUpload(complaint_detail_id, url);
-        }
-        Alert.alert('Success', 'Complaint added successfully with images.');
-      } else {
-        Alert.alert('Success', 'Complaint added successfully without image.');
-      }
+      // Save complaint details and images
+      await handleComplaintDetailsSubmit();
+      await handleImageUpload();
+
+      Alert.alert('Success', 'Complaint added successfully with images.');
       setComplaint('');
       setImages([]);
+
+      // Navigate to the Home screen after submission
       navigation.reset({
-        index: 0, 
+        index: 0,
         routes: [{ name: 'Home' }],
       });
-  
     } catch (error) {
       Alert.alert('Error', 'There was an error while submitting the complaint. Please try again.');
+      console.error('handleSubmit : ', error);
     }
   };
-  
+
+  useEffect(() => {
+    // getLocalDetails();
+  })
 
   return (
     <View style={styles.container}>
@@ -149,9 +148,7 @@ const AddMoreDetail = ({ route, navigation }) => {
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.buttonContainer} />
       </ScrollView>
-      {/* <TouchableOpacity style={styles.button}  onPress={()=> navigation.navigate("Speech")}>
-        <Text style={styles.buttonText}>Speech to text</Text>
-      </TouchableOpacity> */}
+
       <TouchableOpacity style={styles.button} onPress={handleSubmit}>
         <Text style={styles.buttonText}>Add</Text>
       </TouchableOpacity>
@@ -205,7 +202,7 @@ const styles = StyleSheet.create({
   },
   imagePreviewContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap', // This allows images to wrap in the container
+    flexWrap: 'wrap',
     marginBottom: 15,
   },
   imagePreview: {

@@ -59,8 +59,6 @@ const WriteReport = ({ route }) => {
       }
 
       const updatedData = [...existingData, data];
-      console.log(`Updated data for ${key}:`, updatedData);
-
       await AsyncStorage.setItem(key, JSON.stringify(updatedData));
     } catch (error) {
       console.error(`Error saving to local storage (${key}):`, error);
@@ -89,7 +87,6 @@ const WriteReport = ({ route }) => {
 
       if (pendingTitles.length === 0 && pendingDetails.length === 0 && pendingImages.length === 0) {
         Alert.alert("No Sync", "No data is pending for syncing");
-        console.log('No pending data to sync.');
         return;
       }
 
@@ -108,8 +105,6 @@ const WriteReport = ({ route }) => {
 
           // const imagesToUpload = pendingImages.filter((img) => img.complaint_detail_id === titleData.complaint_id);
           // console.log("imagesToUpload",imagesToUpload);
-          console.log("pending images : ", pendingImages);
-          
           for (const img of pendingImages) {
             await handleImageUpload(img.image_id,img.complaint_detail_id, img.url,img.created_at);
           }
@@ -159,9 +154,7 @@ const WriteReport = ({ route }) => {
 
       await api.post('/add-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      console.log("Form Data of images : ", formData);
-      
+      });      
     } catch (error) {
       console.error('Error uploading image:', error);
       throw error;
@@ -194,7 +187,6 @@ const WriteReport = ({ route }) => {
           created_at : created_date, 
         };
         await saveToLocalStorage('titleData', titleData);
-        console.log("Title Data : ", titleData);
         setStep(2);
       } else if (step === 2) {
         const detail_id = generateComplaintId();
@@ -206,7 +198,6 @@ const WriteReport = ({ route }) => {
           created_at :showDate()
         };
         await saveToLocalStorage('complaintDetailData', detailData);
-        console.log("complaintDetail Data : ",detailData);
         setStep(3);
       } else if (step === 3) {
         const imageData = images.map((image, index) => ({
@@ -218,7 +209,6 @@ const WriteReport = ({ route }) => {
         }));
         for (const img of imageData) {
           await saveToLocalStorage('imagesData', img);
-          console.log("img : ", img);
         }
         Alert.alert('Success', 'Complaint saved.');
         setTitle('');
@@ -231,7 +221,7 @@ const WriteReport = ({ route }) => {
       console.error('Submission error:', error);
       Alert.alert('Error', 'Failed to submit the complaint. Please try again later.');
     } finally {
-      setLoading(false); // End loading
+      setLoading(false);
     }
   };
 
@@ -243,7 +233,7 @@ const WriteReport = ({ route }) => {
       multiple: true,
     });
 
-    if (!result.cancelled) {
+    if (!result.canceled) {
       setImages((prevImages) => [...prevImages, ...result.assets.map((asset) => asset.uri)]);
     }
   };
